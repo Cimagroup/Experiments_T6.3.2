@@ -9,6 +9,7 @@ from scipy.spatial import distance_matrix
 import math
 from scipy import sparse
 import matplotlib as mpl
+from scipy.stats import pearsonr
 
 
 ## calculating persistence features and diagram
@@ -288,3 +289,19 @@ def transform_angle(angle):
     else:
         finalAngle = 360 - angle
     return finalAngle
+
+# correlation
+
+from scipy.stats import spearmanr
+warnings.filterwarnings("ignore")
+
+
+def show_correlation(feature1,feature2):
+    corr_spearman, p_value = pearsonr(feature1, feature2)
+    print(f"Spearman's correlation coefficient: {corr_spearman}")
+    print(f"P-value: {p_value}")
+
+    if p_value < 0.05:
+        print("\033[92mThe correlation is statistically significant.\033[0m")
+    else:
+        print("There is insufficient evidence to reject the null hypothesis of no correlation.")
