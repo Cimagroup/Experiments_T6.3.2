@@ -10,7 +10,7 @@ import math
 from scipy import sparse
 import matplotlib as mpl
 from scipy.stats import pearsonr
-
+import pandas as pd
 
 ## calculating persistence features and diagram
 def ComputePersistenceDiagram(ps,moment,dimension,complex="alpha",robotsSelected="all"):
@@ -290,18 +290,84 @@ def transform_angle(angle):
         finalAngle = 360 - angle
     return finalAngle
 
-# correlation
+#count deadlock and extract data from experiment
+def count_deadlocks(deadlock_time, final_time): #deadlock_time is a run.deadlocks item
+    is_deadlocked = np.logical_and(deadlock_time > 0, deadlock_time < (final_time - 2.0))
+    return sum(is_deadlocked)
 
-from scipy.stats import spearmanr
-warnings.filterwarnings("ignore")
+def count_deadlocks(deadlock_time, final_time):
+    is_deadlocked = np.logical_and(deadlock_time > 0, deadlock_time < (final_time - 2.0))
+    return sum(is_deadlocked)
 
-
+def extract_data(experiment, behavior):
+    collisions = []
+    deadlocks = []
+    efficacy = []
+    etas=[]
+    taus=[]
+    sms = []
+    bas = []
+    seeds = []
+    if behavior == "HL":
+        for i, run in experiment.runs.items():
+            world = run.world
+            sm = np.unique([agent.behavior.safety_margin for agent in world.agents])
+            tau = np.unique([agent.behavior.tau for agent in world.agents])
+            eta = np.unique([agent.behavior.eta for agent in world.agents])
+            ba = np.unique([agent.behavior.barrier_angle for agent in world.agents])
+            bas += list(ba)
+            taus += list(tau)
+            etas += list(eta)
+            sms += list(sm)
+            seeds.append(run.seed)
+            final_time = run.world.time
+            deadlocks.append(count_deadlocks(run.deadlocks, final_time))
+            collisions.append(len(run.collisions))
+            efficacy.append(run.efficacy.mean())
+    
+        df = pd.DataFrame({
+            'seeds': seeds,
+            'safety_margin': sms,
+            'eta': etas,
+            'tau': taus,
+            'deadlocks': deadlocks,
+            'collisions': collisions,
+            'barrier_angle': bas,
+            'efficacy': efficacy})
+        df['safe'] = (df.collisions == 0).astype(int)
+        df['fluid'] = (df.deadlocks == 0).astype(int)
+        df['ok'] = ((df.deadlocks == 0) & (df.collisions == 0)).astype(int)
+    elif behavior == "ORCA":
+        for i, run in experiment.runs.items():
+            world = run.world
+            sm = np.unique([agent.behavior.safety_margin for agent in world.agents])
+            sms += list(sm)
+            seeds.append(run.seed)
+            final_time = run.world.time
+            deadlocks.append(count_deadlocks(run.deadlocks, final_time))
+            collisions.append(len(run.collisions))
+            efficacy.append(run.efficacy.mean())
+    
+        df = pd.DataFrame({
+            'seeds': seeds,
+            'safety_margin': sms,
+            'deadlocks': deadlocks,
+            'collisions': collisions,
+            'efficacy': efficacy})
+        df['safe'] = (df.collisions == 0).astype(int)
+        df['fluid'] = (df.deadlocks == 0).astype(int)
+        df['ok'] = ((df.deadlocks == 0) & (df.collisions == 0)).astype(int)
+        
+    return df
+    
+## correlation
 def show_correlation(feature1,feature2):
     corr_spearman, p_value = pearsonr(feature1, feature2)
-    print(f"Spearman's correlation coefficient: {corr_spearman}")
+    print(f"Pearson's correlation coefficient: {corr_spearman}")
     print(f"P-value: {p_value}")
 
     if p_value < 0.05:
         print("\033[92mThe correlation is statistically significant.\033[0m")
     else:
         print("There is insufficient evidence to reject the null hypothesis of no correlation.")
+
